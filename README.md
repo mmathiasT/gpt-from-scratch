@@ -1,0 +1,58 @@
+# Character-level GPT
+
+A small GPT-style language model built from scratch in PyTorch. It learns to write text one character at a time, trained on Shakespeare's plays.
+
+## What it does
+
+The model reads text character by character and learns to guess the next character. After training, it can write new text on its own, one character at a time, in a style close to the training text.
+
+## How it works
+
+- Each character and its position get turned into a list of numbers (embeddings).
+- The numbers pass through several Transformer blocks. Each block has two parts:
+  - Self-attention: lets each character look back at earlier characters and pick up context.
+  - A small feedforward network: processes each character's numbers a bit further.
+- A final layer turns the numbers into a guess for the next character.
+
+## Setup
+
+```bash
+pip install -r requirements.txt
+```
+
+The training text (`input.txt`, Shakespeare's plays) is already included in this repo.
+
+## Usage
+
+```bash
+python gpt.py
+```
+
+This trains the model, printing the loss every 1000 steps, then prints 100 characters of generated text.
+
+## Example output
+
+```
+They of marrum and see it my gods.
+
+Nursecutelf:
+Thou fello: the tell you will meen consenty his in
+```
+
+(Trained with a small setup — `n_embd=64`, `n_layer=4`, `n_head=4`, `block_size=64` — to keep training time reasonable on a CPU. Bigger settings and more training steps give more coherent, more word-like text.)
+
+## Settings
+
+These live at the top of `gpt.py`:
+
+| Setting | What it controls |
+|---|---|
+| `block_size` | how many previous characters the model can look at |
+| `n_embd` | how many numbers describe each character |
+| `n_head` | how many attention "heads" work in parallel in each block |
+| `n_layer` | how many Transformer blocks are stacked |
+| `dropout` | how much randomness is used during training to avoid overfitting |
+
+## Simpler baseline: `bigram.py`
+
+`bigram.py` is a much simpler model — a bigram model that only looks at the single previous character to guess the next one, with no attention and no Transformer blocks. It's included to show the starting point before adding attention, and to make the jump in quality from `gpt.py` easier to see.
