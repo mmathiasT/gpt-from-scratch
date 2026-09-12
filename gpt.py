@@ -186,6 +186,23 @@ gpt_model = GPTLanguageModel()
 model_device = gpt_model.to(device)
 optimizer = torch.optim.AdamW(gpt_model.parameters(), lr=learning_rate)
 
+
+batches_to_avg = 50
+
+@torch.no_grad()    # Disable gradient tracking for evaluation.
+def estimate_loss():
+    out = {}
+    gpt_model.eval()    # Disable dropout, so the loss estimate is stable and reproducible.
+    for split in ['training', 'validation']:
+        losses = torch.zeros(batches_to_avg)
+        for k in range(batches_to_avg):
+            inputs, targets = get_batch(split)
+            logits, loss = gpt_model(inputs, targets)    # Calls forward() internally.
+            losses[k] = loss.item()
+        out[split] = losses.mean()
+    gpt_model.train()   # Re-enable dropout for the rest of the training.
+    return out
+
 for it in range(training_iterations):
     inputs, targets = get_batch('training')
     logits, loss = gpt_model(inputs, targets)    # Calls forward() internally.
@@ -193,9 +210,11 @@ for it in range(training_iterations):
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
-    if it % 1000 == 0:
-        print(loss.item())
+    if it % 500 == 0:
+        losses = estimate_loss()
+        print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}")
 
+gpt_model.eval()
 start_context = torch.zeros((1, 1), dtype=torch.long, device=device)
 generated_text = gpt_model.generate(start_context, max_new_tokens=100)
 print(decode(generated_text[0].tolist()))

@@ -33,10 +33,11 @@ This trains the model, printing the loss every 1000 steps, then prints 100 chara
 ## Example output
 
 ```
-They of marrum and see it my gods.
+It thou perdon strengtter, ever to she is and love,
+You have see watch me.
 
-Nursecutelf:
-Thou fello: the tell you will meen consenty his in
+DUKE OF YORK:
+Welcome.
 ```
 
 (Trained with a small setup — `n_embd=64`, `n_layer=4`, `n_head=4`, `block_size=64` — to keep training time reasonable on a CPU. Bigger settings and more training steps give more coherent, more word-like text.)
@@ -56,3 +57,15 @@ These live at the top of `gpt.py`:
 ## Simpler baseline: `bigram.py`
 
 `bigram.py` is a much simpler model — a bigram model that only looks at the single previous character to guess the next one, with no attention and no Transformer blocks. It's included to show the starting point before adding attention, and to make the jump in quality from `gpt.py` easier to see.
+
+## Sources
+
+Built while learning about Transformers and attention mechanisms from:
+
+- [Transformers in Deep Learning Course](https://www.youtube.com/watch?v=lRylkiFdUdk&list=PLuhqtP7jdD8CQTxwVsuiFYGvHtFpNhlR3)
+- [Andrej Karpathy - Let's build GPT: from scratch, in code, spelled out](https://www.youtube.com/watch?v=kCc8FmEb1nY)
+- [GPT Architecture | How to create ChatGPT from Scratch?](https://www.youtube.com/watch?v=kNxGURHpYqM)
+- [Multi-Head Attention Explained Visually | Simple Transformer Guide](https://www.youtube.com/watch?v=42L1q1Z4Ojc)
+- [How GPT Actually Works: Transformer Decoder Explained Visually](https://www.youtube.com/watch?v=KE9fqU4EG4o)
+- [Understanding GPT: A Simple Explanation of Its Architecture and Applications](https://ravjot03.medium.com/understanding-gpt-a-simple-explanation-of-its-architecture-and-applications-94ef2b92b172)
+- [Generative pre-trained transformer - Wikipedia](https://en.wikipedia.org/wiki/Generative_pre-trained_transformer)
