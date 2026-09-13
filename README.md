@@ -43,14 +43,12 @@ This trains the model from scratch, printing the training/validation loss every 
 ## Example output
 
 ```
-It thou perdon strengtter, ever to she is and love,
-You have see watch me.
-
-DUKE OF YORK:
-Welcome.
+As misfortune this feast now, in his half
+Shall be same a chamber where I lay. My last uncle gone,
+T
 ```
 
-(Trained with a small setup — `n_embd=64`, `n_layer=4`, `n_head=4`, `block_size=64` — to keep training time reasonable on a CPU. Bigger settings and more training steps give more coherent, more word-like text.)
+(Trained with a larger setup — `n_embd=256`, `n_layer=4`, `n_head=4`, `block_size=64`, 10000 training steps — for several hours on a CPU.)
 
 ## Settings
 
