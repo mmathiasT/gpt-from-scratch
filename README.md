@@ -24,11 +24,21 @@ The training text (`input.txt`, Shakespeare's plays) is already included in this
 
 ## Usage
 
+A trained model (`gpt_model.pt`) is already included in this repo, so you can generate text right away, with no training needed:
+
 ```bash
-python gpt.py
+python gpt_generate.py
 ```
 
-This trains the model, printing the loss every 1000 steps, then prints 100 characters of generated text.
+This loads `gpt_model.pt` and prints 100 characters of generated text.
+
+If you want to retrain the model yourself (e.g. after changing a setting), run:
+
+```bash
+python gpt_train.py
+```
+
+This trains the model from scratch, printing the training/validation loss every 500 steps, then overwrites `gpt_model.pt` with the newly trained weights (and the character vocabulary).
 
 ## Example output
 
@@ -44,7 +54,7 @@ Welcome.
 
 ## Settings
 
-These live at the top of `gpt.py`:
+The model's architecture settings live at the top of `gpt_model.py`. Training settings (learning rate, number of training steps, batch size) live at the top of `gpt_train.py`.
 
 | Setting | What it controls |
 |---|---|
@@ -56,7 +66,7 @@ These live at the top of `gpt.py`:
 
 ## Simpler baseline: `bigram.py`
 
-`bigram.py` is a much simpler model — a bigram model that only looks at the single previous character to guess the next one, with no attention and no Transformer blocks. It's included to show the starting point before adding attention, and to make the jump in quality from `gpt.py` easier to see.
+`bigram.py` is a much simpler model — a bigram model that only looks at the single previous character to guess the next one, with no attention and no Transformer blocks. It's included to show the starting point before adding attention, and to make the jump in quality from `gpt_model.py`/`gpt_train.py` easier to see.
 
 ## Sources
 

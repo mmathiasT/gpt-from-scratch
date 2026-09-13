@@ -1,68 +1,12 @@
 import torch
 
-learning_rate = 1e-3
-training_iterations = 10000
-
-block_size = 64
-batch_size = 64
 device = 'cuda' if torch.cuda.is_available() else 'cpu'     # Use GPU if available, otherwise use CPU.
+block_size = 64
+dropout = 0.2  # Dropout rate for regularization, so the model doesn't overfit to the specific pieces of training data .
 
 n_head = 4  # Number of attention heads in the multi-head attention mechanism.
 n_layer = 4  # Number of transformer blocks in the model.
-n_embd = 64  # Size of the embedding vector for each token.
-dropout = 0.2  # Dropout rate for regularization, so the model doesn't overfit to the specific pieces of training data .
-
-def encode(string: str):
-    result = []
-    for ch in string:
-        result.append(stoi[ch])
-    return result
-
-def decode(indices: list):
-    result = []
-    for i in indices:
-        result.append(itos[i])
-    return ''.join(result)
-
-
-with open('input.txt', 'r', encoding='utf-8') as file:
-    text = file.read()
-
-chars = sorted(list(set(text)))
-vocab_size = len(chars)
-
-stoi = {}
-itos = {}
-
-for integ, ch in enumerate(chars):
-    stoi[ch] = integ
-    itos[integ] = ch
-
-
-data = torch.tensor(encode(text), dtype=torch.long)     # Encode the whole text into a tensor of integers
-train_size = int(0.9*len(data))
-train_data = data[:train_size]
-val_data = data[train_size:]
-
-def get_batch(data_type: str):
-    if data_type == 'training':
-        data  = train_data
-    else:
-        data = val_data
-
-    indices = torch.randint(len(data) - block_size, (batch_size,))
-    inputs = []
-    targets = []
-    for i in indices:
-        inputs.append(data[i:i+block_size])
-        targets.append(data[i+1:i+1+block_size])
-    stacked_inputs = torch.stack(inputs)
-    stacked_targets = torch.stack(targets)
-
-    stacked_inputs = stacked_inputs.to(device)
-    stacked_targets = stacked_targets.to(device)
-
-    return stacked_inputs, stacked_targets
+n_embd = 256  # Size of the embedding vector for each token.
 
 class Head(torch.nn.Module):
     def __init__(self, head_size):
@@ -109,10 +53,10 @@ class MultiHeadAttention(torch.nn.Module):
     def forward(self, token_repr):
         out = []
         for h in self.heads:
-            out.append(h(token_repr)) # Run each head (call + forward) on the same input and collect their outputs.
+            out.append(h(token_repr))           # Run each head (call + forward) on the same input and collect their outputs.
 
         concatenated = torch.cat(out, dim=-1)
-        projected = self.proj(concatenated)     # Project the concatenated outputs back to n_embd dimensions.
+        projected = self.proj(concatenated)
         return self.dropout(projected)
 
 class FeedForward(torch.nn.Module):
@@ -135,16 +79,17 @@ class Block(torch.nn.Module):
         self.layer_norm2 = torch.nn.LayerNorm(n_embd)
 
     def forward(self, token_repr):  
-        token_repr = token_repr + self.attention(self.layer_norm1(token_repr))  # Residual connection.
-        token_repr = token_repr + self.feed_forward(self.layer_norm2(token_repr))  # Residual connection.
+        token_repr = token_repr + self.attention(self.layer_norm1(token_repr))
+        token_repr = token_repr + self.feed_forward(self.layer_norm2(token_repr)) 
         return token_repr
 
 class GPTLanguageModel(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, vocab_size: int):
         super().__init__()
-        self.token_embedding_table = torch.nn.Embedding(vocab_size, n_embd)
+        self.vocab_size = vocab_size
+        self.token_embedding_table = torch.nn.Embedding(self.vocab_size, n_embd)
         self.position_embedding_table = torch.nn.Embedding(block_size, n_embd)  # Similar to token embeddings, but for positions.
-        self.final_linear_layer = torch.nn.Linear(n_embd, vocab_size)
+        self.final_linear_layer = torch.nn.Linear(n_embd, self.vocab_size)
         self.blocks = torch.nn.ModuleList()
         for _ in range(n_layer):
             self.blocks.append(Block(n_embd, n_head))
@@ -153,14 +98,13 @@ class GPTLanguageModel(torch.nn.Module):
     # Predicts logits for the next character, using the full preceding context (up to block_size tokens).
     def forward(self, context, targets=None):
         batch_size, num_tokens = context.shape
-        tok_emb = self.token_embedding_table(context)
+        tok_emb = self.token_embedding_table(context)       # Get token embeddings for each token in the context.
         position_emb = self.position_embedding_table(torch.arange(num_tokens, device=device))
-        token_repr = tok_emb + position_emb
+        token_repr = tok_emb + position_emb                 # PyTorch will automatically expand the position embeddings to match the batch size.
         for block in self.blocks:
             token_repr = block(token_repr)
         token_repr = self.final_normalization(token_repr)
         logits = self.final_linear_layer(token_repr)
-
 
         loss = None
         if targets is not None:
@@ -168,7 +112,7 @@ class GPTLanguageModel(torch.nn.Module):
             logits = logits.view(batch_size * num_tokens, vocab_size)
             batch_size, num_tokens = targets.shape
             targets = targets.view(batch_size * num_tokens)
-            loss = torch.nn.functional.cross_entropy(logits, targets)
+            loss = torch.nn.functional.cross_entropy(logits, targets)       # Calculate the loss between the predicted logits and the true targets.
         return logits, loss
 
     def generate(self, context, max_new_tokens):
@@ -181,40 +125,3 @@ class GPTLanguageModel(torch.nn.Module):
             next_chars = torch.multinomial(probabilities, num_samples=1) # Draw 1 character.
             context = torch.cat((context, next_chars), dim=1) # Append the newly sampled character to the end of each sequence.
         return context
-
-gpt_model = GPTLanguageModel()
-model_device = gpt_model.to(device)
-optimizer = torch.optim.AdamW(gpt_model.parameters(), lr=learning_rate)
-
-
-batches_to_avg = 50
-
-@torch.no_grad()    # Disable gradient tracking for evaluation.
-def estimate_loss():
-    out = {}
-    gpt_model.eval()    # Disable dropout, so the loss estimate is stable and reproducible.
-    for split in ['training', 'validation']:
-        losses = torch.zeros(batches_to_avg)
-        for k in range(batches_to_avg):
-            inputs, targets = get_batch(split)
-            logits, loss = gpt_model(inputs, targets)    # Calls forward() internally.
-            losses[k] = loss.item()
-        out[split] = losses.mean()
-    gpt_model.train()   # Re-enable dropout for the rest of the training.
-    return out
-
-for it in range(training_iterations):
-    inputs, targets = get_batch('training')
-    logits, loss = gpt_model(inputs, targets)    # Calls forward() internally.
-
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
-    if it % 500 == 0:
-        losses = estimate_loss()
-        print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}")
-
-gpt_model.eval()
-start_context = torch.zeros((1, 1), dtype=torch.long, device=device)
-generated_text = gpt_model.generate(start_context, max_new_tokens=100)
-print(decode(generated_text[0].tolist()))
