@@ -1,10 +1,23 @@
+import argparse
 import torch
-from gpt_model import GPTLanguageModel, block_size, device
+from gpt_model import GPTLanguageModel, device
 
-learning_rate = 1e-3
-training_iterations = 10000
+parser = argparse.ArgumentParser()
+parser.add_argument('--block_size', type=int, default=256, help='The maximum context length for the model.')
+parser.add_argument('--n_embd', type=int, default=384, help='The dimensionality of the token embeddings.')
+parser.add_argument('--n_head', type=int, default=6, help='The number of attention heads in each multi-head attention layer.')
+parser.add_argument('--n_layer', type=int, default=6, help='The number of transformer blocks in the model.')
+parser.add_argument('--dropout', type=float, default=0.2, help='The dropout rate for regularization.')
+parser.add_argument('--learning_rate', type=float, default=1e-3, help='The learning rate for the optimizer.')
+parser.add_argument('--training_iterations', type=int, default=10000, help='The number of training iterations.')
+parser.add_argument('--batch_size', type=int, default=256, help='The number of samples per batch during training.')
+args = parser.parse_args()
 
-batch_size = 256
+
+learning_rate = args.learning_rate
+training_iterations = args.training_iterations
+batch_size = args.batch_size
+block_size = args.block_size
 
 def encode(string: str):
     result = []
@@ -50,12 +63,34 @@ def get_batch(data_type: str):
 
     return stacked_inputs, stacked_targets
 
+gpt_model = GPTLanguageModel(
+    vocab_size=len(chars),
+    n_embd=args.n_embd,
+    n_head=args.n_head,
+    n_layer=args.n_layer,
+    block_size=args.block_size,
+    dropout=args.dropout,
+)
 
-gpt_model = GPTLanguageModel(vocab_size=len(chars))
 model_device = gpt_model.to(device)
 optimizer = torch.optim.AdamW(gpt_model.parameters(), lr=learning_rate)
 
 batches_to_avg = 50
+
+def save_checkpoint(filename):
+    checkpoint = {
+        'model_state_dict': gpt_model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'stoi': stoi,
+        'itos': itos,
+        'vocab_size': vocab_size,
+        'block_size': block_size,
+        'n_embd': args.n_embd,
+        'n_head': args.n_head,
+        'n_layer': args.n_layer,
+        'dropout': args.dropout
+    }
+    torch.save(checkpoint, filename)
 
 @torch.no_grad()    # Disable gradient tracking for evaluation.
 def estimate_loss():
@@ -71,6 +106,7 @@ def estimate_loss():
     gpt_model.train()   # Re-enable dropout for the rest of the training.
     return out
 
+best_validation_loss = float('inf')
 for it in range(training_iterations):
     inputs, targets = get_batch('training')
     logits, loss = gpt_model(inputs, targets)    # Calls forward() internally.
@@ -81,11 +117,10 @@ for it in range(training_iterations):
     if it % 500 == 0:
         losses = estimate_loss()
         print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}")
+        save_checkpoint('gpt_latest_model.pt')
+        if losses['validation'] < best_validation_loss:
+            best_validation_loss = losses['validation']
+            save_checkpoint('gpt_best_model.pt')   # Save the best model checkpoint based on validation loss.
 
-torch.save({
-    'model_state_dict': gpt_model.state_dict(),
-    'stoi': stoi,
-    'itos': itos,
-    'vocab_size': vocab_size,
-}, 'gpt_model.pt')
-print("Model saved to gpt_model.pt")
+save_checkpoint('gpt_latest_model.pt')
+print("Latest model saved to gpt_latest_model.pt, best model saved to gpt_best_model.pt")

@@ -1,15 +1,17 @@
 import torch
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'     # Use GPU if available, otherwise use CPU.
+'''
+Default hyperparameters for the GPT model.
 block_size = 64
 dropout = 0.2  # Dropout rate for regularization, so the model doesn't overfit to the specific pieces of training data .
-
 n_head = 4  # Number of attention heads in the multi-head attention mechanism.
 n_layer = 4  # Number of transformer blocks in the model.
 n_embd = 256  # Size of the embedding vector for each token.
+'''
 
 class Head(torch.nn.Module):
-    def __init__(self, head_size):
+    def __init__(self, head_size: int, block_size: int, dropout: float, n_embd: int):
         super().__init__()
         # bias=False on all three, so they don't have constant offsets.
         self.key = torch.nn.Linear(n_embd, head_size, bias=False)
@@ -41,11 +43,11 @@ class Head(torch.nn.Module):
         return dropouted @ self.value(token_repr)
 
 class MultiHeadAttention(torch.nn.Module):
-    def __init__(self, num_head: int, head_size: int):
+    def __init__(self, num_head: int, head_size: int, dropout: float, n_embd: int, block_size: int):
         super().__init__()
         self.heads = torch.nn.ModuleList()
         for _ in range(num_head):
-            self.heads.append(Head(head_size))
+            self.heads.append(Head(head_size, block_size, dropout, n_embd))
         self.proj = torch.nn.Linear(head_size * num_head, n_embd)
         self.dropout = torch.nn.Dropout(dropout)
 
@@ -60,7 +62,7 @@ class MultiHeadAttention(torch.nn.Module):
         return self.dropout(projected)
 
 class FeedForward(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, n_embd: int, dropout: float):
         super().__init__()
         self.expand = torch.nn.Linear(n_embd, 4 * n_embd)     # Expand the representation, so the non-linear function has more space to work with.
         self.activation = torch.nn.ReLU()                     # Not linear function for universal approximation theorem.
@@ -71,10 +73,10 @@ class FeedForward(torch.nn.Module):
         return self.dropout(self.shrink(self.activation(self.expand(token_repr))))
 
 class Block(torch.nn.Module):
-    def __init__(self, n_embd, n_head):
+    def __init__(self, n_embd, n_head, dropout, block_size):
         super().__init__()
-        self.attention = MultiHeadAttention(num_head=n_head, head_size=n_embd//n_head)
-        self.feed_forward = FeedForward()
+        self.attention = MultiHeadAttention(num_head=n_head, head_size=n_embd//n_head, dropout=dropout, n_embd=n_embd, block_size=block_size)
+        self.feed_forward = FeedForward(n_embd, dropout)
         self.layer_norm1 = torch.nn.LayerNorm(n_embd)
         self.layer_norm2 = torch.nn.LayerNorm(n_embd)
 
@@ -84,15 +86,16 @@ class Block(torch.nn.Module):
         return token_repr
 
 class GPTLanguageModel(torch.nn.Module):
-    def __init__(self, vocab_size: int):
+    def __init__(self, vocab_size: int, n_embd: int, n_head: int, n_layer: int, block_size: int, dropout: float):
         super().__init__()
         self.vocab_size = vocab_size
         self.token_embedding_table = torch.nn.Embedding(self.vocab_size, n_embd)
         self.position_embedding_table = torch.nn.Embedding(block_size, n_embd)  # Similar to token embeddings, but for positions.
         self.final_linear_layer = torch.nn.Linear(n_embd, self.vocab_size)
+        self.blocksize = block_size
         self.blocks = torch.nn.ModuleList()
         for _ in range(n_layer):
-            self.blocks.append(Block(n_embd, n_head))
+            self.blocks.append(Block(n_embd, n_head, dropout, block_size))
         self.final_normalization = torch.nn.LayerNorm(n_embd)
         
     # Predicts logits for the next character, using the full preceding context (up to block_size tokens).
@@ -112,16 +115,26 @@ class GPTLanguageModel(torch.nn.Module):
             logits = logits.view(batch_size * num_tokens, vocab_size)
             batch_size, num_tokens = targets.shape
             targets = targets.view(batch_size * num_tokens)
-            loss = torch.nn.functional.cross_entropy(logits, targets)       # Calculate the loss between the predicted logits and the true targets.
+            loss = torch.nn.functional.cross_entropy(logits, targets)    # Calculate the loss between the predicted logits and the true targets.
         return logits, loss
 
-    def generate(self, context, max_new_tokens):
+    def generate(self, context, max_new_tokens: int, temperature: float = 1.0, top_p: float = 1.0):
         for i in range(0,max_new_tokens):
-            logits, loss = self(context[:, -block_size:])    # Calls forward() internally.
+            logits, loss = self(context[:, -self.blocksize:])    # Calls forward() internally.
             # Copy predictions only for the last position.
             last_logits = logits[:, -1, :]  
             # Convert logits to probabilities, set dim to -1 to normalize across the vocab so each row sums to 1.
-            probabilities = torch.nn.functional.softmax(last_logits, dim=-1) 
+            probabilities = torch.nn.functional.softmax(last_logits / temperature, dim=-1)
+            # Use top-p sampling to filter the probabilities.
+            sorted_logits, sorted_indices = torch.sort(probabilities, descending=True)
+            probs_sum = 0
+            for j in range(sorted_logits.size(1)):
+                if probs_sum < top_p:
+                    probs_sum += sorted_logits[0][j].item()
+                else:
+                    probabilities[0][sorted_indices[0][j]] = 0
+            probabilities = probabilities / probabilities.sum()  # Normalize the filtered probabilities to sum to 1.
+
             next_chars = torch.multinomial(probabilities, num_samples=1) # Draw 1 character.
             context = torch.cat((context, next_chars), dim=1) # Append the newly sampled character to the end of each sequence.
         return context

@@ -24,43 +24,69 @@ The training text (`input.txt`, Shakespeare's plays) is already included in this
 
 ## Usage
 
-A trained model (`gpt_model.pt`) is already included in this repo, so you can generate text right away, with no training needed:
+Trained model checkpoints (`gpt_best_model.pt`, `gpt_latest_model.pt`) are already included in this repo, so you can generate text right away, with no training needed:
 
 ```bash
 python gpt_generate.py
 ```
 
-This loads `gpt_model.pt` and prints 100 characters of generated text.
+This loads `gpt_best_model.pt` by default and prints 100 characters of generated text.
 
-If you want to retrain the model yourself (e.g. after changing a setting), run:
+Optional flags:
+
+```bash
+python gpt_generate.py --version latest --max_new_tokens 300 --temperature 0.8 --top_p 0.9
+```
+
+| Flag | What it controls |
+|---|---|
+| `--version` | which checkpoint to load: `best` (lowest validation loss seen) or `latest` (most recent step) |
+| `--max_new_tokens` | how many characters to generate |
+| `--temperature` | randomness of sampling — lower is more predictable, higher is more random |
+| `--top_p` | nucleus sampling threshold — only sample from the smallest set of characters whose combined probability exceeds this value |
+
+If you want to retrain the model yourself, run:
 
 ```bash
 python gpt_train.py
 ```
 
-This trains the model from scratch, printing the training/validation loss every 500 steps, then overwrites `gpt_model.pt` with the newly trained weights (and the character vocabulary).
+This trains the model from scratch, printing the training/validation loss every 500 steps. It saves two checkpoints as it goes: `gpt_latest_model.pt` (updated every 500 steps) and `gpt_best_model.pt` (updated only when validation loss improves), so training can be interrupted at any time without losing progress. Architecture and training settings can be overridden with flags, e.g.:
+
+```bash
+python gpt_train.py --n_embd 256 --n_head 4 --n_layer 4 --block_size 128 --batch_size 64 --training_iterations 5000
+```
 
 ## Example output
 
 ```
-As misfortune this feast now, in his half
-Shall be same a chamber where I lay. My last uncle gone,
-T
+KING RICLARD II:
+Our sin;' then, that fly harm
+the noble receive hed.
+
+AUTOLYCUS:
+O, thou used upon these throne!
+
+COMINIUS:
+Fear prince, sir. Poor to hearly it.
 ```
 
-(Trained with a larger setup — `n_embd=256`, `n_layer=4`, `n_head=4`, `block_size=64`, 10000 training steps — for several hours on a CPU.)
+(Generated with `--temperature 0.8 --top_p 0.9`. Model trained with `n_embd=256`, `n_head=4`, `n_layer=4`, `block_size=128`, `batch_size=64`, `dropout=0.1`, for up to 5000 training steps — several hours on a CPU.)
 
 ## Settings
 
-The model's architecture settings live at the top of `gpt_model.py`. Training settings (learning rate, number of training steps, batch size) live at the top of `gpt_train.py`.
+Architecture and training settings are passed as command-line flags to `gpt_train.py` (see `python gpt_train.py --help` for defaults).
 
 | Setting | What it controls |
 |---|---|
-| `block_size` | how many previous characters the model can look at |
-| `n_embd` | how many numbers describe each character |
-| `n_head` | how many attention "heads" work in parallel in each block |
-| `n_layer` | how many Transformer blocks are stacked |
-| `dropout` | how much randomness is used during training to avoid overfitting |
+| `--block_size` | how many previous characters the model can look at |
+| `--n_embd` | how many numbers describe each character |
+| `--n_head` | how many attention "heads" work in parallel in each block |
+| `--n_layer` | how many Transformer blocks are stacked |
+| `--dropout` | how much randomness is used during training to avoid overfitting |
+| `--learning_rate` | how big each optimizer update step is |
+| `--batch_size` | how many sequences are processed per training step |
+| `--training_iterations` | how many training steps to run |
 
 ## Simpler baseline: `bigram.py`
 
