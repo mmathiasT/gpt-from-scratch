@@ -116,7 +116,7 @@ for it in range(training_iterations):
     optimizer.step()
     if it % 500 == 0:
         losses = estimate_loss()
-        print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}")
+        print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}", flush=True)
         save_checkpoint('gpt_latest_model.pt')
         if losses['validation'] < best_validation_loss:
             best_validation_loss = losses['validation']
