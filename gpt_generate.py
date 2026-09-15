@@ -3,11 +3,13 @@ import argparse
 import torch
 from gpt_model import GPTLanguageModel, device
 
+
 def decode(indices: list):
     result = []
     for i in indices:
         result.append(gpt_checkpoint['itos'][i])
     return ''.join(result)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--version', choices=['latest', 'best'], default='best', help='Choose which model checkpoint to load: latest or best.')

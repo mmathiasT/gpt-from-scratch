@@ -10,6 +10,7 @@ n_layer = 4  # Number of transformer blocks in the model.
 n_embd = 256  # Size of the embedding vector for each token.
 '''
 
+
 class Head(torch.nn.Module):
     def __init__(self, head_size: int, block_size: int, dropout: float, n_embd: int):
         super().__init__()
@@ -39,8 +40,9 @@ class Head(torch.nn.Module):
         softmaxed = torch.nn.functional.softmax(masked, dim=-1)
 
         dropouted = self.dropout(softmaxed)
-        
+
         return dropouted @ self.value(token_repr)
+
 
 class MultiHeadAttention(torch.nn.Module):
     def __init__(self, num_head: int, head_size: int, dropout: float, n_embd: int, block_size: int):
@@ -55,35 +57,38 @@ class MultiHeadAttention(torch.nn.Module):
     def forward(self, token_repr):
         out = []
         for h in self.heads:
-            out.append(h(token_repr))           # Run each head (call + forward) on the same input and collect their outputs.
+            out.append(h(token_repr))           # Run head call + forward and collect its output.
 
         concatenated = torch.cat(out, dim=-1)
         projected = self.proj(concatenated)
         return self.dropout(projected)
 
+
 class FeedForward(torch.nn.Module):
     def __init__(self, n_embd: int, dropout: float):
         super().__init__()
         self.expand = torch.nn.Linear(n_embd, 4 * n_embd)     # Expand the representation, so the non-linear function has more space to work with.
-        self.activation = torch.nn.ReLU()                     # Not linear function for universal approximation theorem.
+        self.activation = torch.nn.ReLU()                     # Nonlinear function for universal approximation theorem.
         self.shrink = torch.nn.Linear(4 * n_embd, n_embd)     # Weighted sum of the 4*n_embd ReLU "pieces" back down to n_embd. Approximation of some function of the token repr.
         self.dropout = torch.nn.Dropout(dropout)
 
     def forward(self, token_repr):
         return self.dropout(self.shrink(self.activation(self.expand(token_repr))))
 
+
 class Block(torch.nn.Module):
     def __init__(self, n_embd, n_head, dropout, block_size):
         super().__init__()
-        self.attention = MultiHeadAttention(num_head=n_head, head_size=n_embd//n_head, dropout=dropout, n_embd=n_embd, block_size=block_size)
+        self.attention = MultiHeadAttention(num_head=n_head, head_size=n_embd // n_head, dropout=dropout, n_embd=n_embd, block_size=block_size)
         self.feed_forward = FeedForward(n_embd, dropout)
         self.layer_norm1 = torch.nn.LayerNorm(n_embd)
         self.layer_norm2 = torch.nn.LayerNorm(n_embd)
 
-    def forward(self, token_repr):  
+    def forward(self, token_repr):
         token_repr = token_repr + self.attention(self.layer_norm1(token_repr))
-        token_repr = token_repr + self.feed_forward(self.layer_norm2(token_repr)) 
+        token_repr = token_repr + self.feed_forward(self.layer_norm2(token_repr))
         return token_repr
+
 
 class GPTLanguageModel(torch.nn.Module):
     def __init__(self, vocab_size: int, n_embd: int, n_head: int, n_layer: int, block_size: int, dropout: float):
@@ -97,7 +102,7 @@ class GPTLanguageModel(torch.nn.Module):
         for _ in range(n_layer):
             self.blocks.append(Block(n_embd, n_head, dropout, block_size))
         self.final_normalization = torch.nn.LayerNorm(n_embd)
-        
+
     # Predicts logits for the next character, using the full preceding context (up to block_size tokens).
     def forward(self, context, targets=None):
         batch_size, num_tokens = context.shape
@@ -119,10 +124,10 @@ class GPTLanguageModel(torch.nn.Module):
         return logits, loss
 
     def generate(self, context, max_new_tokens: int, temperature: float = 1.0, top_p: float = 1.0):
-        for i in range(0,max_new_tokens):
+        for i in range(0, max_new_tokens):
             logits, loss = self(context[:, -self.blocksize:])    # Calls forward() internally.
             # Copy predictions only for the last position.
-            last_logits = logits[:, -1, :]  
+            last_logits = logits[:, -1, :]
             # Convert logits to probabilities, set dim to -1 to normalize across the vocab so each row sums to 1.
             probabilities = torch.nn.functional.softmax(last_logits / temperature, dim=-1)
             # Use top-p sampling to filter the probabilities.
@@ -135,6 +140,6 @@ class GPTLanguageModel(torch.nn.Module):
                     probabilities[0][sorted_indices[0][j]] = 0
             probabilities = probabilities / probabilities.sum()  # Normalize the filtered probabilities to sum to 1.
 
-            next_chars = torch.multinomial(probabilities, num_samples=1) # Draw 1 character.
-            context = torch.cat((context, next_chars), dim=1) # Append the newly sampled character to the end of each sequence.
+            next_chars = torch.multinomial(probabilities, num_samples=1)  # Draw 1 character.
+            context = torch.cat((context, next_chars), dim=1)  # Append the newly sampled character to the end of each sequence.
         return context

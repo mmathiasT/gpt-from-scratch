@@ -23,16 +23,18 @@ warmup_iterations = args.warmup_iterations
 batch_size = args.batch_size
 block_size = args.block_size
 
-if args.min_learning_rate == None:
+if args.min_learning_rate is None:
     min_learning_rate = max_learning_rate / 10
 else:
     min_learning_rate = args.min_learning_rate
+
 
 def encode(string: str):
     result = []
     for ch in string:
         result.append(stoi[ch])
     return result
+
 
 with open('input.txt', 'r', encoding='utf-8') as file:
     text = file.read()
@@ -48,13 +50,14 @@ for integ, ch in enumerate(chars):
     itos[integ] = ch
 
 data = torch.tensor(encode(text), dtype=torch.long)     # Encode the whole text into a tensor of integers
-train_size = int(0.9*len(data))
+train_size = int(0.9 * len(data))
 train_data = data[:train_size]
 val_data = data[train_size:]
 
+
 def get_batch(data_type: str):
     if data_type == 'training':
-        data  = train_data
+        data = train_data
     else:
         data = val_data
 
@@ -62,8 +65,8 @@ def get_batch(data_type: str):
     inputs = []
     targets = []
     for i in indices:
-        inputs.append(data[i:i+block_size])
-        targets.append(data[i+1:i+1+block_size])
+        inputs.append(data[i:i + block_size])
+        targets.append(data[i + 1:i + 1 + block_size])
     stacked_inputs = torch.stack(inputs)
     stacked_targets = torch.stack(targets)
 
@@ -71,6 +74,7 @@ def get_batch(data_type: str):
     stacked_targets = stacked_targets.to(device)
 
     return stacked_inputs, stacked_targets
+
 
 gpt_model = GPTLanguageModel(
     vocab_size=len(chars),
@@ -85,6 +89,7 @@ model_device = gpt_model.to(device)
 optimizer = torch.optim.AdamW(gpt_model.parameters(), lr=max_learning_rate)
 
 batches_to_avg = 50
+
 
 def save_checkpoint(filename):
     checkpoint = {
@@ -101,6 +106,7 @@ def save_checkpoint(filename):
     }
     torch.save(checkpoint, filename)
 
+
 @torch.no_grad()    # Disable gradient tracking for evaluation.
 def estimate_loss():
     out = {}
@@ -115,13 +121,14 @@ def estimate_loss():
     gpt_model.train()   # Re-enable dropout for the rest of the training.
     return out
 
+
 def get_learning_rate(iteration: int, max_lr: float, min_lr: float, warmup_iterations: int, training_iterations: int):
     if iteration < warmup_iterations:
         return max_lr * (iteration / warmup_iterations)
     else:
         decay_ratio = (iteration - warmup_iterations) / (training_iterations - warmup_iterations)
         # Cosine of pi*decay_ratio is going from 1 to -1 as decay_ratio goes from 0 to 1. We add 1 and divide by 2 so it goes from 1 to 0.
-        coeff = (1 + math.cos(math.pi * decay_ratio))/2
+        coeff = (1 + math.cos(math.pi * decay_ratio)) / 2
         return min_lr + coeff * (max_lr - min_lr)
 
 
@@ -130,10 +137,10 @@ for it in range(training_iterations):
     inputs, targets = get_batch('training')
     logits, loss = gpt_model(inputs, targets)    # Calls forward() internally.
 
-    learning_rate = get_learning_rate(it, max_learning_rate, min_learning_rate, warmup_iterations, training_iterations) 
+    learning_rate = get_learning_rate(it, max_learning_rate, min_learning_rate, warmup_iterations, training_iterations)
     for param_group in optimizer.param_groups:
         param_group['lr'] = learning_rate
-        
+
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
@@ -145,5 +152,9 @@ for it in range(training_iterations):
             best_validation_loss = losses['validation']
             save_checkpoint('gpt_best_model.pt')   # Save the best model checkpoint based on validation loss.
 
+final_losses = estimate_loss()
+print(f"Final (step {training_iterations}): Training loss: {final_losses['training']:.4f}, Validation loss: {final_losses['validation']:.4f}", flush=True)
 save_checkpoint('gpt_latest_model.pt')
+if final_losses['validation'] < best_validation_loss:
+    save_checkpoint('gpt_best_model.pt')
 print("Latest model saved to gpt_latest_model.pt, best model saved to gpt_best_model.pt")

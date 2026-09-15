@@ -92,6 +92,22 @@ Architecture and training settings are passed as command-line flags to `gpt_trai
 
 The learning rate follows a warmup + cosine decay schedule: it ramps up linearly for `--warmup_iterations` steps, then decays smoothly down to `--min_learning_rate` by the end of training. This is the same schedule used to train GPT-style models in practice (and in Karpathy's nanoGPT).
 
+## Model size vs. quality/speed tradeoff
+
+To see how model depth affects results, `n_layer` was swept over `[1, 2, 4, 6, 8]` (all other settings fixed: `n_embd=256`, `n_head=4`, `block_size=128`, `batch_size=64`, `dropout=0.1`), training each variant for a short, fixed budget of 300 steps purely to compare them against each other (not to reach best possible quality).
+
+| n_layer | Validation loss | Training time (300 steps) |
+|---|---|---|
+| 1 | 2.5102 | 7m 18s |
+| 2 | 2.4783 | 9m 11s |
+| 4 | 2.4422 | 16m 31s |
+| 6 | 2.4229 | 24m 30s |
+| 8 | 2.4185 | 34m 57s |
+
+![Validation loss and training time vs n_layer](sweep_results.png)
+
+More layers give a better loss, but each extra layer helps less than the last: 1→2 layers improves loss by 0.032, while 6→8 only improves it by 0.004. Training time doesn't grow as fast as layer count either: 8x more layers only took about 4.8x more time.
+
 ## Simpler baseline: `bigram.py`
 
 `bigram.py` is a much simpler model — a bigram model that only looks at the single previous character to guess the next one, with no attention and no Transformer blocks. It's included to show the starting point before adding attention, and to make the jump in quality from `gpt_model.py`/`gpt_train.py` easier to see.
