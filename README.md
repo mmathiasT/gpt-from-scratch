@@ -84,9 +84,13 @@ Architecture and training settings are passed as command-line flags to `gpt_trai
 | `--n_head` | how many attention "heads" work in parallel in each block |
 | `--n_layer` | how many Transformer blocks are stacked |
 | `--dropout` | how much randomness is used during training to avoid overfitting |
-| `--learning_rate` | how big each optimizer update step is |
+| `--max_learning_rate` | peak size of each optimizer update step, reached after warmup |
+| `--min_learning_rate` | learning rate at the end of training (cosine decay floor); defaults to `max_learning_rate / 10` |
+| `--warmup_iterations` | how many steps to linearly ramp the learning rate up to `max_learning_rate` before it starts decaying |
 | `--batch_size` | how many sequences are processed per training step |
 | `--training_iterations` | how many training steps to run |
+
+The learning rate follows a warmup + cosine decay schedule: it ramps up linearly for `--warmup_iterations` steps, then decays smoothly down to `--min_learning_rate` by the end of training. This is the same schedule used to train GPT-style models in practice (and in Karpathy's nanoGPT).
 
 ## Simpler baseline: `bigram.py`
 

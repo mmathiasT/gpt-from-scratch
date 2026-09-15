@@ -1,5 +1,6 @@
 import argparse
 import torch
+import math
 from gpt_model import GPTLanguageModel, device
 
 parser = argparse.ArgumentParser()
@@ -8,16 +9,24 @@ parser.add_argument('--n_embd', type=int, default=384, help='The dimensionality 
 parser.add_argument('--n_head', type=int, default=6, help='The number of attention heads in each multi-head attention layer.')
 parser.add_argument('--n_layer', type=int, default=6, help='The number of transformer blocks in the model.')
 parser.add_argument('--dropout', type=float, default=0.2, help='The dropout rate for regularization.')
-parser.add_argument('--learning_rate', type=float, default=1e-3, help='The learning rate for the optimizer.')
+parser.add_argument('--max_learning_rate', type=float, default=1e-3, help='The learning rate for the optimizer.')
 parser.add_argument('--training_iterations', type=int, default=10000, help='The number of training iterations.')
 parser.add_argument('--batch_size', type=int, default=256, help='The number of samples per batch during training.')
+parser.add_argument('--warmup_iterations', type=int, default=1000, help='The number of iterations to linearly increase the learning rate before decaying.')
+parser.add_argument('--min_learning_rate', type=float, default=None, help="Minimum learning rate at the end of cosine decay. Defaults to learning_rate / 10.")
 args = parser.parse_args()
 
 
-learning_rate = args.learning_rate
+max_learning_rate = args.max_learning_rate
 training_iterations = args.training_iterations
+warmup_iterations = args.warmup_iterations
 batch_size = args.batch_size
 block_size = args.block_size
+
+if args.min_learning_rate == None:
+    min_learning_rate = max_learning_rate / 10
+else:
+    min_learning_rate = args.min_learning_rate
 
 def encode(string: str):
     result = []
@@ -73,7 +82,7 @@ gpt_model = GPTLanguageModel(
 )
 
 model_device = gpt_model.to(device)
-optimizer = torch.optim.AdamW(gpt_model.parameters(), lr=learning_rate)
+optimizer = torch.optim.AdamW(gpt_model.parameters(), lr=max_learning_rate)
 
 batches_to_avg = 50
 
@@ -106,17 +115,31 @@ def estimate_loss():
     gpt_model.train()   # Re-enable dropout for the rest of the training.
     return out
 
+def get_learning_rate(iteration: int, max_lr: float, min_lr: float, warmup_iterations: int, training_iterations: int):
+    if iteration < warmup_iterations:
+        return max_lr * (iteration / warmup_iterations)
+    else:
+        decay_ratio = (iteration - warmup_iterations) / (training_iterations - warmup_iterations)
+        # Cosine of pi*decay_ratio is going from 1 to -1 as decay_ratio goes from 0 to 1. We add 1 and divide by 2 so it goes from 1 to 0.
+        coeff = (1 + math.cos(math.pi * decay_ratio))/2
+        return min_lr + coeff * (max_lr - min_lr)
+
+
 best_validation_loss = float('inf')
 for it in range(training_iterations):
     inputs, targets = get_batch('training')
     logits, loss = gpt_model(inputs, targets)    # Calls forward() internally.
 
+    learning_rate = get_learning_rate(it, max_learning_rate, min_learning_rate, warmup_iterations, training_iterations) 
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = learning_rate
+        
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
     if it % 500 == 0:
         losses = estimate_loss()
-        print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}", flush=True)
+        print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}, LR: {learning_rate:.6f}", flush=True)
         save_checkpoint('gpt_latest_model.pt')
         if losses['validation'] < best_validation_loss:
             best_validation_loss = losses['validation']
