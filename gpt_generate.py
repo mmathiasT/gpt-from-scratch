@@ -31,5 +31,6 @@ gpt_model.to(device)
 gpt_model.eval()
 
 start_context = torch.zeros((1, 1), dtype=torch.long, device=device)
-generated_text = gpt_model.generate(start_context, max_new_tokens=args.max_new_tokens, temperature=args.temperature, top_p=args.top_p)
+with torch.no_grad():
+    generated_text = gpt_model.generate(start_context, max_new_tokens=args.max_new_tokens, temperature=args.temperature, top_p=args.top_p)
 print(decode(generated_text[0].tolist()))
