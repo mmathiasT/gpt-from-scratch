@@ -19,9 +19,9 @@ parser.add_argument('--top_p', type=float, default=1.0, help='The top-p filterin
 args = parser.parse_args()
 
 if args.version == 'latest':
-    file_name = 'gpt_latest_model.pt'
+    file_name = 'checkpoints/gpt_latest_model.pt'
 else:
-    file_name = 'gpt_best_model.pt'
+    file_name = 'checkpoints/gpt_best_model.pt'
 
 gpt_checkpoint = torch.load(file_name, map_location=device)
 

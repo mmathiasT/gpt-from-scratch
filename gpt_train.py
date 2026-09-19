@@ -1,4 +1,5 @@
 import argparse
+import os
 import torch
 import math
 from gpt_model import GPTLanguageModel, device
@@ -91,6 +92,9 @@ optimizer = torch.optim.AdamW(gpt_model.parameters(), lr=max_learning_rate)
 batches_to_avg = 50
 
 
+os.makedirs('checkpoints', exist_ok=True)
+
+
 def save_checkpoint(filename):
     checkpoint = {
         'model_state_dict': gpt_model.state_dict(),
@@ -147,14 +151,14 @@ for it in range(training_iterations):
     if it % 500 == 0:
         losses = estimate_loss()
         print(f"Step {it}: Training loss: {losses['training']:.4f}, Validation loss: {losses['validation']:.4f}, LR: {learning_rate:.6f}", flush=True)
-        save_checkpoint('gpt_latest_model.pt')
+        save_checkpoint('checkpoints/gpt_latest_model.pt')
         if losses['validation'] < best_validation_loss:
             best_validation_loss = losses['validation']
-            save_checkpoint('gpt_best_model.pt')   # Save the best model checkpoint based on validation loss.
+            save_checkpoint('checkpoints/gpt_best_model.pt')   # Save the best model checkpoint based on validation loss.
 
 final_losses = estimate_loss()
 print(f"Final (step {training_iterations}): Training loss: {final_losses['training']:.4f}, Validation loss: {final_losses['validation']:.4f}", flush=True)
-save_checkpoint('gpt_latest_model.pt')
+save_checkpoint('checkpoints/gpt_latest_model.pt')
 if final_losses['validation'] < best_validation_loss:
-    save_checkpoint('gpt_best_model.pt')
-print("Latest model saved to gpt_latest_model.pt, best model saved to gpt_best_model.pt")
+    save_checkpoint('checkpoints/gpt_best_model.pt')
+print("Latest model saved to checkpoints/gpt_latest_model.pt, best model saved to checkpoints/gpt_best_model.pt")

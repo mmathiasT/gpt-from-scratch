@@ -24,13 +24,13 @@ The training text (`input.txt`, Shakespeare's plays) is already included in this
 
 ## Usage
 
-Trained model checkpoints (`gpt_best_model.pt`, `gpt_latest_model.pt`) are already included in this repo, so you can generate text right away, with no training needed:
+Trained model checkpoints (`checkpoints/gpt_best_model.pt`, `checkpoints/gpt_latest_model.pt`) are already included in this repo, so you can generate text right away, with no training needed:
 
 ```bash
 python gpt_generate.py
 ```
 
-This loads `gpt_best_model.pt` by default and prints 100 characters of generated text.
+This loads `checkpoints/gpt_best_model.pt` by default and prints 100 characters of generated text.
 
 Optional flags:
 
@@ -51,7 +51,7 @@ If you want to retrain the model yourself, run:
 python gpt_train.py
 ```
 
-This trains the model from scratch, printing the training/validation loss every 500 steps. It saves two checkpoints as it goes: `gpt_latest_model.pt` (updated every 500 steps) and `gpt_best_model.pt` (updated only when validation loss improves), so training can be interrupted at any time without losing progress. Architecture and training settings can be overridden with flags, e.g.:
+This trains the model from scratch, printing the training/validation loss every 500 steps. It saves two checkpoints as it goes into `checkpoints/`: `gpt_latest_model.pt` (updated every 500 steps) and `gpt_best_model.pt` (updated only when validation loss improves), so training can be interrupted at any time without losing progress. Architecture and training settings can be overridden with flags, e.g.:
 
 ```bash
 python gpt_train.py --n_embd 256 --n_head 4 --n_layer 4 --block_size 128 --batch_size 64 --training_iterations 5000
